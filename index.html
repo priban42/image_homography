@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homography Transform Studio</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;600&display=swap');
+        
+        :root {
+            --bg-primary: #0a0e14;
+            --bg-secondary: #141920;
+            --bg-tertiary: #1c222b;
+            --accent-primary: #00e5ff;
+            --accent-secondary: #7c3aed;
+            --text-primary: #e6e9ef;
+            --text-secondary: #8b92a3;
+            --border: #2d3748;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Sora', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(0, 229, 255, 0.08) 0%, transparent 50%);
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+        
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            animation: fadeIn 1s ease-out 0.2s both;
+        }
+        
+        .controls {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.8s ease-out 0.3s both;
+        }
+        
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-primary);
+            margin-bottom: 0.75rem;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .file-input-label {
+            display: block;
+            padding: 1rem 1.5rem;
+            background: var(--bg-tertiary);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .file-input-label:hover {
+            border-color: var(--accent-primary);
+            background: rgba(0, 229, 255, 0.05);
+            transform: translateY(-2px);
+        }
+        
+        .button {
+            padding: 0.875rem 1.75rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 10px;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.3);
+        }
+        
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .canvas-wrapper {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+        }
+        
+        .canvas-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-primary);
+            margin-bottom: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        canvas {
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+            background: var(--bg-tertiary);
+            display: block;
+            position: relative;
+        }
+        
+        .zoom-lens {
+            position: fixed;
+            width: 200px;
+            height: 200px;
+            border: 3px solid var(--accent-primary);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+            background: var(--bg-secondary);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+            display: none;
+        }
+        
+        .zoom-lens canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+        
+        .zoom-lens::after {
+            content: '+';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--accent-primary);
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+        
+        .points-display {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        
+        .point-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+        
+        .point-label {
+            color: var(--accent-primary);
+        }
+        
+        .instructions {
+            background: rgba(124, 58, 237, 0.1);
+            border-left: 3px solid var(--accent-secondary);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            animation: fadeIn 1s ease-out 0.5s both;
+        }
+        
+        .instructions p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .status.show {
+            opacity: 1;
+        }
+        
+        .status.success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            color: var(--success);
+        }
+        
+        .status.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: var(--error);
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 20, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            z-index: 10;
+        }
+        
+        .loading-overlay.show {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .canvas-container {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="zoom-lens" id="zoomLens">
+            <canvas id="zoomCanvas"></canvas>
+        </div>
+        
+        <header>
+            <h1>Homography Transform Studio</h1>
+            <p class="subtitle">Perspective Warp · 4-Point Calibration · Geometric Transformation</p>
+        </header>
+        
+        <div class="instructions">
+            <p>
+                <strong>Perspective Correction Tool:</strong> Upload an image and select 4 corner points of a quadrilateral region (e.g., a tilted document, book page, or sign). 
+                The tool will apply a homography transformation to "unwarp" that region into a rectangular image. Click points in order: top-left, top-right, bottom-right, bottom-left.
+            </p>
+        </div>
+        
+        <div id="status" class="status"></div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Reference Image (click to select 4 points)</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="referenceImage" accept="image/*">
+                    <div class="file-input-label">
+                        📁 Choose Reference Image
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Target Image (to be transformed)</label>
+                <div class="file-input-wrapper">
+                    <input type="file" id="targetImage" accept="image/*">
+                    <div class="file-input-label">
+                        📁 Choose Target Image
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="button-group">
+                    <button class="button" id="applyHomography" disabled>Apply Homography</button>
+                    <button class="button" id="applyInverse" disabled>Apply Inverse Homography</button>
+                    <button class="button" id="resetPoints">Reset Points</button>
+                    <button class="button" id="downloadResult" disabled>Download Result</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <div class="canvas-title">Reference Image</div>
+                <canvas id="referenceCanvas"></canvas>
+                <div class="points-display" id="pointsDisplay">
+                    <div class="point-item">
+                        <span class="point-label">Points Selected:</span>
+                        <span id="pointCount">0 / 4</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <div class="canvas-title">Target Image</div>
+                <canvas id="targetCanvas"></canvas>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <div class="canvas-title">Result</div>
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                </div>
+                <canvas id="resultCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Canvas elements
+        const referenceCanvas = document.getElementById('referenceCanvas');
+        const targetCanvas = document.getElementById('targetCanvas');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const refCtx = referenceCanvas.getContext('2d');
+        const targetCtx = targetCanvas.getContext('2d');
+        const resultCtx = resultCanvas.getContext('2d');
+        
+        // Zoom lens
+        const zoomLens = document.getElementById('zoomLens');
+        const zoomCanvas = document.getElementById('zoomCanvas');
+        const zoomCtx = zoomCanvas.getContext('2d');
+        const ZOOM_FACTOR = 2;
+        const ZOOM_SIZE = 200;
+        zoomCanvas.width = ZOOM_SIZE;
+        zoomCanvas.height = ZOOM_SIZE;
+        
+        // State
+        let referenceImage = null;
+        let targetImage = null;
+        let selectedPoints = [];
+        let homographyMatrix = null;
+        
+        // UI Elements
+        const pointCountDisplay = document.getElementById('pointCount');
+        const statusDiv = document.getElementById('status');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        
+        // File inputs
+        document.getElementById('referenceImage').addEventListener('change', handleReferenceUpload);
+        document.getElementById('targetImage').addEventListener('change', handleTargetUpload);
+        
+        // Buttons
+        document.getElementById('applyHomography').addEventListener('click', () => applyTransform(false));
+        document.getElementById('applyInverse').addEventListener('click', () => applyTransform(true));
+        document.getElementById('resetPoints').addEventListener('click', resetPoints);
+        document.getElementById('downloadResult').addEventListener('click', downloadResult);
+        
+        // Canvas events
+        referenceCanvas.addEventListener('click', handleCanvasClick);
+        referenceCanvas.addEventListener('mousemove', handleMouseMove);
+        referenceCanvas.addEventListener('mouseenter', () => {
+            if (referenceImage && selectedPoints.length < 4) {
+                zoomLens.style.display = 'block';
+            }
+        });
+        referenceCanvas.addEventListener('mouseleave', () => {
+            zoomLens.style.display = 'none';
+        });
+        
+        function handleReferenceUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    referenceImage = img;
+                    referenceCanvas.width = img.width;
+                    referenceCanvas.height = img.height;
+                    drawReferenceImage();
+                    resetPoints();
+                    showStatus('Reference image loaded', 'success');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function handleTargetUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    targetImage = img;
+                    targetCanvas.width = img.width;
+                    targetCanvas.height = img.height;
+                    targetCtx.drawImage(img, 0, 0);
+                    showStatus('Target image loaded', 'success');
+                    updateButtons();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function handleMouseMove(e) {
+            if (!referenceImage || selectedPoints.length >= 4) {
+                zoomLens.style.display = 'none';
+                return;
+            }
+            
+            const rect = referenceCanvas.getBoundingClientRect();
+            const scaleX = referenceCanvas.width / rect.width;
+            const scaleY = referenceCanvas.height / rect.height;
+            const canvasX = (e.clientX - rect.left) * scaleX;
+            const canvasY = (e.clientY - rect.top) * scaleY;
+            
+            // Position zoom lens
+            zoomLens.style.left = (e.clientX + 20) + 'px';
+            zoomLens.style.top = (e.clientY + 20) + 'px';
+            
+            // Draw zoomed content
+            zoomCtx.fillStyle = '#1c222b';
+            zoomCtx.fillRect(0, 0, ZOOM_SIZE, ZOOM_SIZE);
+            
+            const zoomRegionSize = ZOOM_SIZE / ZOOM_FACTOR;
+            const sx = Math.max(0, canvasX - zoomRegionSize / 2);
+            const sy = Math.max(0, canvasY - zoomRegionSize / 2);
+            const sw = zoomRegionSize;
+            const sh = zoomRegionSize;
+            
+            zoomCtx.drawImage(
+                referenceCanvas,
+                sx, sy, sw, sh,
+                0, 0, ZOOM_SIZE, ZOOM_SIZE
+            );
+            
+            // Draw crosshair
+            zoomCtx.strokeStyle = '#00e5ff';
+            zoomCtx.lineWidth = 2;
+            zoomCtx.beginPath();
+            zoomCtx.moveTo(ZOOM_SIZE / 2, 0);
+            zoomCtx.lineTo(ZOOM_SIZE / 2, ZOOM_SIZE);
+            zoomCtx.moveTo(0, ZOOM_SIZE / 2);
+            zoomCtx.lineTo(ZOOM_SIZE, ZOOM_SIZE / 2);
+            zoomCtx.stroke();
+            
+            // Draw center circle
+            zoomCtx.beginPath();
+            zoomCtx.arc(ZOOM_SIZE / 2, ZOOM_SIZE / 2, 3, 0, Math.PI * 2);
+            zoomCtx.fillStyle = '#00e5ff';
+            zoomCtx.fill();
+        }
+        
+        function handleCanvasClick(e) {
+            if (!referenceImage || selectedPoints.length >= 4) return;
+            
+            const rect = referenceCanvas.getBoundingClientRect();
+            const scaleX = referenceCanvas.width / rect.width;
+            const scaleY = referenceCanvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            selectedPoints.push({x, y});
+            drawReferenceImage();
+            updatePointsDisplay();
+            updateButtons();
+            
+            if (selectedPoints.length === 4) {
+                zoomLens.style.display = 'none';
+                showStatus('All 4 points selected - ready to compute homography', 'success');
+            }
+        }
+        
+        function drawReferenceImage() {
+            if (!referenceImage) return;
+            
+            refCtx.drawImage(referenceImage, 0, 0);
+            
+            // Draw lines between points first (so they appear under the points)
+            if (selectedPoints.length > 1) {
+                refCtx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+                refCtx.lineWidth = 3;
+                refCtx.setLineDash([10, 5]);
+                refCtx.beginPath();
+                refCtx.moveTo(selectedPoints[0].x, selectedPoints[0].y);
+                for (let i = 1; i < selectedPoints.length; i++) {
+                    refCtx.lineTo(selectedPoints[i].x, selectedPoints[i].y);
+                }
+                if (selectedPoints.length === 4) {
+                    refCtx.closePath();
+                }
+                refCtx.stroke();
+                refCtx.setLineDash([]);
+            }
+            
+            // Draw points with larger size and better visibility
+            selectedPoints.forEach((point, index) => {
+                // Outer glow
+                refCtx.shadowColor = '#00e5ff';
+                refCtx.shadowBlur = 20;
+                
+                // Outer circle
+                refCtx.fillStyle = 'rgba(0, 229, 255, 0.3)';
+                refCtx.beginPath();
+                refCtx.arc(point.x, point.y, 20, 0, Math.PI * 2);
+                refCtx.fill();
+                
+                // Middle circle
+                refCtx.fillStyle = '#00e5ff';
+                refCtx.beginPath();
+                refCtx.arc(point.x, point.y, 12, 0, Math.PI * 2);
+                refCtx.fill();
+                
+                // Inner circle
+                refCtx.fillStyle = '#0a0e14';
+                refCtx.beginPath();
+                refCtx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+                refCtx.fill();
+                
+                refCtx.shadowBlur = 0;
+                
+                // Draw label
+                refCtx.fillStyle = '#00e5ff';
+                refCtx.font = 'bold 24px JetBrains Mono';
+                refCtx.strokeStyle = '#0a0e14';
+                refCtx.lineWidth = 4;
+                refCtx.strokeText((index + 1).toString(), point.x + 25, point.y - 15);
+                refCtx.fillText((index + 1).toString(), point.x + 25, point.y - 15);
+            });
+        }
+        
+        function updatePointsDisplay() {
+            pointCountDisplay.textContent = `${selectedPoints.length} / 4`;
+        }
+        
+        function updateButtons() {
+            const hasAllPoints = selectedPoints.length === 4;
+            const hasTargetImage = targetImage !== null;
+            
+            document.getElementById('applyHomography').disabled = !(hasAllPoints && hasTargetImage);
+            document.getElementById('applyInverse').disabled = !(hasAllPoints && hasTargetImage);
+        }
+        
+        function resetPoints() {
+            selectedPoints = [];
+            homographyMatrix = null;
+            drawReferenceImage();
+            updatePointsDisplay();
+            updateButtons();
+            resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+            document.getElementById('downloadResult').disabled = true;
+            showStatus('Points reset', 'success');
+        }
+        
+        function applyTransform(inverse) {
+            if (selectedPoints.length !== 4 || !targetImage) return;
+            
+            // Show loading overlay
+            loadingOverlay.classList.add('show');
+            
+            // Use setTimeout to allow the loading animation to render
+            setTimeout(() => {
+                try {
+                    // Calculate target dimensions based on edge lengths of the quadrilateral
+                    const p0 = selectedPoints[0];
+                    const p1 = selectedPoints[1];
+                    const p2 = selectedPoints[2];
+                    const p3 = selectedPoints[3];
+                    
+                    // Calculate distances between points
+                    const distance = (pt1, pt2) => Math.sqrt(Math.pow(pt2.x - pt1.x, 2) + Math.pow(pt2.y - pt1.y, 2));
+                    
+                    const widthTop = distance(p0, p1);
+                    const widthBottom = distance(p3, p2);
+                    const targetWidth = Math.round(Math.max(widthTop, widthBottom));
+                    
+                    const heightLeft = distance(p0, p3);
+                    const heightRight = distance(p1, p2);
+                    const targetHeight = Math.round(Math.max(heightLeft, heightRight));
+                    
+                    // Define destination rectangle at p0 position (not at origin)
+                    const dstPoints = [
+                        {x: p0.x, y: p0.y},
+                        {x: p0.x + targetWidth - 1, y: p0.y},
+                        {x: p0.x + targetWidth - 1, y: p0.y + targetHeight - 1},
+                        {x: p0.x, y: p0.y + targetHeight - 1}
+                    ];
+                    
+                    let H;
+                    if (inverse) {
+                        // Inverse: rectangle -> selected quadrilateral
+                        H = computeHomography(dstPoints, selectedPoints);
+                    } else {
+                        // Forward: selected quadrilateral -> rectangle
+                        H = computeHomography(selectedPoints, dstPoints);
+                    }
+                    
+                    homographyMatrix = H;
+                    
+                    console.log('Computed Homography Matrix:');
+                    console.log(H);
+                    console.log(`Target dimensions: ${targetWidth} x ${targetHeight}`);
+                    console.log(`Rectangle position: (${p0.x}, ${p0.y})`);
+                    
+                    // Apply transformation to entire image
+                    applyHomographyToFullImage(H);
+                    
+                    // Hide loading overlay
+                    loadingOverlay.classList.remove('show');
+                    
+                    showStatus(`${inverse ? 'Inverse ' : ''}Homography applied successfully`, 'success');
+                    
+                } catch (error) {
+                    loadingOverlay.classList.remove('show');
+                    showStatus('Error computing homography: ' + error.message, 'error');
+                    console.error(error);
+                }
+            }, 50);
+        }
+        
+        function applyHomographyToFullImage(H) {
+            // Calculate bounding box that includes the entire transformed image
+            const Hinv = invertMatrix3x3(H);
+            
+            // Check all corners of the source image to find output bounds
+            const imageCorners = [
+                {x: 0, y: 0},
+                {x: targetImage.width - 1, y: 0},
+                {x: targetImage.width - 1, y: targetImage.height - 1},
+                {x: 0, y: targetImage.height - 1}
+            ];
+            
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            
+            // Transform all image corners through the homography to find output bounds
+            for (const corner of imageCorners) {
+                const denom = H[2][0] * corner.x + H[2][1] * corner.y + H[2][2];
+                const dstX = (H[0][0] * corner.x + H[0][1] * corner.y + H[0][2]) / denom;
+                const dstY = (H[1][0] * corner.x + H[1][1] * corner.y + H[1][2]) / denom;
+                
+                minX = Math.min(minX, dstX);
+                minY = Math.min(minY, dstY);
+                maxX = Math.max(maxX, dstX);
+                maxY = Math.max(maxY, dstY);
+            }
+            
+            // Calculate output dimensions
+            const outputWidth = Math.ceil(maxX - minX) + 1;
+            const outputHeight = Math.ceil(maxY - minY) + 1;
+            
+            // Set result canvas size
+            resultCanvas.width = outputWidth;
+            resultCanvas.height = outputHeight;
+            
+            // Get source image data
+            const srcData = targetCtx.getImageData(0, 0, targetImage.width, targetImage.height);
+            const dstData = resultCtx.createImageData(outputWidth, outputHeight);
+            
+            // Apply transformation with offset
+            const offsetX = minX;
+            const offsetY = minY;
+            
+            for (let y = 0; y < outputHeight; y++) {
+                for (let x = 0; x < outputWidth; x++) {
+                    // Adjust coordinates back to homography space
+                    const homogX = x + offsetX;
+                    const homogY = y + offsetY;
+                    
+                    // Apply inverse homography to find source pixel
+                    const denom = Hinv[2][0] * homogX + Hinv[2][1] * homogY + Hinv[2][2];
+                    const srcX = (Hinv[0][0] * homogX + Hinv[0][1] * homogY + Hinv[0][2]) / denom;
+                    const srcY = (Hinv[1][0] * homogX + Hinv[1][1] * homogY + Hinv[1][2]) / denom;
+                    
+                    const dstIdx = (y * outputWidth + x) * 4;
+                    
+                    // Bilinear interpolation
+                    if (srcX >= 0 && srcX <= targetImage.width - 1 && 
+                        srcY >= 0 && srcY <= targetImage.height - 1) {
+                        
+                        const x0 = Math.floor(srcX);
+                        const x1 = Math.min(x0 + 1, targetImage.width - 1);
+                        const y0 = Math.floor(srcY);
+                        const y1 = Math.min(y0 + 1, targetImage.height - 1);
+                        
+                        const fx = srcX - x0;
+                        const fy = srcY - y0;
+                        
+                        // Interpolate each color channel
+                        for (let c = 0; c < 4; c++) {
+                            const idx00 = (y0 * targetImage.width + x0) * 4 + c;
+                            const idx10 = (y0 * targetImage.width + x1) * 4 + c;
+                            const idx01 = (y1 * targetImage.width + x0) * 4 + c;
+                            const idx11 = (y1 * targetImage.width + x1) * 4 + c;
+                            
+                            const v00 = srcData.data[idx00];
+                            const v10 = srcData.data[idx10];
+                            const v01 = srcData.data[idx01];
+                            const v11 = srcData.data[idx11];
+                            
+                            // Bilinear interpolation formula
+                            const v0 = v00 * (1 - fx) + v10 * fx;
+                            const v1 = v01 * (1 - fx) + v11 * fx;
+                            const v = v0 * (1 - fy) + v1 * fy;
+                            
+                            dstData.data[dstIdx + c] = Math.round(v);
+                        }
+                    } else {
+                        // Outside bounds - make transparent
+                        dstData.data[dstIdx + 0] = 0;
+                        dstData.data[dstIdx + 1] = 0;
+                        dstData.data[dstIdx + 2] = 0;
+                        dstData.data[dstIdx + 3] = 0;
+                    }
+                }
+            }
+            
+            resultCtx.putImageData(dstData, 0, 0);
+            document.getElementById('downloadResult').disabled = false;
+        }
+        
+        function computeHomography(srcPoints, dstPoints) {
+            // Build the matrix A for DLT (Direct Linear Transform)
+            const A = [];
+            
+            for (let i = 0; i < 4; i++) {
+                const x = srcPoints[i].x;
+                const y = srcPoints[i].y;
+                const xp = dstPoints[i].x;
+                const yp = dstPoints[i].y;
+                
+                A.push([
+                    -x, -y, -1, 0, 0, 0, xp * x, xp * y, xp
+                ]);
+                A.push([
+                    0, 0, 0, -x, -y, -1, yp * x, yp * y, yp
+                ]);
+            }
+            
+            // Solve using SVD - find the null space (smallest singular value)
+            // Compute A^T * A for symmetric eigenvalue problem
+            const AtA = numeric.dot(numeric.transpose(A), A);
+            
+            // Compute eigenvalues and eigenvectors
+            const eig = numeric.eig(AtA);
+            
+            // Find the eigenvector corresponding to the smallest eigenvalue
+            let minIdx = 0;
+            let minVal = Math.abs(eig.lambda.x[0]);
+            for (let i = 1; i < eig.lambda.x.length; i++) {
+                const val = Math.abs(eig.lambda.x[i]);
+                if (val < minVal) {
+                    minVal = val;
+                    minIdx = i;
+                }
+            }
+            
+            // Get the eigenvector (column of eigenvector matrix)
+            const h = [];
+            for (let i = 0; i < 9; i++) {
+                h.push(eig.E.x[i][minIdx]);
+            }
+            
+            // Reshape into 3x3 matrix
+            const H = [
+                [h[0], h[1], h[2]],
+                [h[3], h[4], h[5]],
+                [h[6], h[7], h[8]]
+            ];
+            
+            // Normalize so that H[2][2] = 1
+            const scale = H[2][2];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    H[i][j] /= scale;
+                }
+            }
+            
+            return H;
+        }
+        
+        function invertMatrix3x3(m) {
+            // Use numeric.js for matrix inversion
+            try {
+                const inv = numeric.inv(m);
+                return inv;
+            } catch (e) {
+                throw new Error('Matrix is singular and cannot be inverted');
+            }
+        }
+        
+        function downloadResult() {
+            if (resultCanvas.width === 0 || resultCanvas.height === 0) {
+                showStatus('No result to download', 'error');
+                return;
+            }
+            
+            try {
+                resultCanvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.download = 'homography-result.png';
+                    link.href = url;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    showStatus('Image downloaded successfully', 'success');
+                }, 'image/png');
+            } catch (error) {
+                showStatus('Error downloading image: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type} show`;
+            setTimeout(() => {
+                statusDiv.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
